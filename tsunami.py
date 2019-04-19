@@ -2,7 +2,7 @@
 # PYTHON for FEM DUMMIES 18-19
 # Projet "tsunami"
 #
-# Canevas de départ
+# Canevas de dÃ©part
 #  Vincent Legat
 #
 # -------------------------------------------------------------------------
@@ -68,11 +68,13 @@ def initialConditionOkada(x,y) :
  
 # -------------------------------------------------------------------------
 
+def bathymetry(theMeshFile)
+
+# -------------------------------------------------------------------------
+
 def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
-
-#
-# A COMPLETER.....   
-# 
-
-
+  nNode,X,Y,H,nElem,elem = readMesh(theMeshFile)
+  
+  
+  
   return [U,V,E]
