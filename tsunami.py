@@ -1,14 +1,6 @@
-#bbbbbbbbbbbbbbbb
-# PYTHON for FEM DUMMIES 18-19
-# Projet "tsunami"
-#
-# Canevas de départ
-#  Vincent Legat
-#
-# -------------------------------------------------------------------------
-#
 
 import numpy as np
+
 # -------------------------------------------------------------------------
 
 def readMesh(fileName) :
@@ -21,6 +13,8 @@ def readMesh(fileName) :
   Y = xyz[:,1]
   H = xyz[:,2]
   return [nNode,X,Y,H,nElem,elem]
+theMeshFile = "PacificTriangleFine.txt"
+[nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
 
 # -------------------------------------------------------------------------
 
@@ -66,13 +60,18 @@ def initialConditionOkada(x,y) :
   return np.all([lon2 <= lonMax,lon2 >= lonMin,lat2 >= latMin,lat2 <= latMax],axis=0).astype(int)
 
 # -------------------------------------------------------------------------
-
-def bathymetry(theMeshFile)
-
-# -------------------------------------------------------------------------
+def interpollation2D(U,xsi,eta):
+    return U[0]*xsi+U[1]*eta+U[2]*(1-xsi-eta)
+def interpollation1D(U,xsi):
+    return 0.5*(U[0]*(1-xsi)+U[1]*(1+xsi))
+def bathymetrie(theMeshFile,ielem,xsi,eta):# renvoie une interpollation de la bathymetrie au point xsi eta
+    theMesh=readMesh(theMeshFile)
+    Nodes=elem[ielem]
+    return interpollation2D(H[Nodes],xsi,eta)
+print(bathymetrie(theMeshFile,1,0,0))
 
 def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
-  nNode,X,Y,H,nElem,elem = readMesh(theMeshFile)
+  #inversion et euler explicite
 
 
 
