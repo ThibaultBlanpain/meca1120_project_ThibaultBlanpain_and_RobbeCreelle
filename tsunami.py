@@ -9,7 +9,6 @@
 # 
 
 import numpy as np
-hello darkness my olf friend
 # -------------------------------------------------------------------------
 
 def readMesh(fileName) :
