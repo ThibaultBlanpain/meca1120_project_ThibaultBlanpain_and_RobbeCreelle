@@ -7,7 +7,7 @@
 #  Vincent Legat
 #
 # -------------------------------------------------------------------------
-# 
+#
 
 import numpy as np
 import tsunami as tsunami
@@ -16,13 +16,13 @@ import tsunami as tsunami
 # -1- Lecture des données
 #
 
-theMeshFile = "PacificTriangleFine.txt"
+theMeshFile = "PacificTriangleTiny.txt"
 [nNode,X,Y,H,nElem,elem] = tsunami.readMesh(theMeshFile)
 print(" == Number of elements : %d " % nElem)
 print(" == Number of nodes    : %d " % nNode)
 
 #
-# -2- On impose la condition initiale et on sauvegarde les élévations 
+# -2- On impose la condition initiale et on sauvegarde les élévations
 #     linéaires discontinues dans un fichier de résultats :-)
 #
 #     Observer qu'on a créé des coordonnées discontinues pour pouvoir
@@ -34,14 +34,14 @@ y = np.zeros([nElem,3])
 for iElem in range(nElem):
   nodes  = elem[iElem]
   x[iElem][:] = X[nodes]
-  y[iElem][:] = Y[nodes] 
+  y[iElem][:] = Y[nodes]
 E = tsunami.initialConditionOkada(x,y)
 
 theResultFiles = "eta-%06d.txt"
 tsunami.writeResult(theResultFiles,0,E)
 
 #
-# -3- Calcul du tsunami en relisant les conditions initiales 
+# -3- Calcul du tsunami en relisant les conditions initiales
 #     dans le fichier qu'on vient juste d'écrire :-)
 #
 

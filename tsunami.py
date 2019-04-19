@@ -13,7 +13,7 @@ def readMesh(fileName) :
   Y = xyz[:,1]
   H = xyz[:,2]
   return [nNode,X,Y,H,nElem,elem]
-theMeshFile = "PacificTriangleFine.txt"
+theMeshFile = "PacificTriangleTiny.txt"
 [nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
 
 # -------------------------------------------------------------------------
@@ -61,18 +61,61 @@ def initialConditionOkada(x,y) :
 
 # -------------------------------------------------------------------------
 def interpollation2D(U,xsi,eta):
-    return U[0]*xsi+U[1]*eta+U[2]*(1-xsi-eta)
+    return U[0]*xsi+U[1]*eta+U[2]*(np.ones(3)-xsi-eta)
 def interpollation1D(U,xsi):
     return 0.5*(U[0]*(1-xsi)+U[1]*(1+xsi))
 def bathymetrie(theMeshFile,ielem,xsi,eta):# renvoie une interpollation de la bathymetrie au point xsi eta
     theMesh=readMesh(theMeshFile)
     Nodes=elem[ielem]
     return interpollation2D(H[Nodes],xsi,eta)
-print(bathymetrie(theMeshFile,1,0,0))
+
+def computeShapeTriangle(theMesh,theElement) :
+  dphidxsi = np.array([ 1.0, 0.0,-1.0])
+  dphideta = np.array([ 0.0, 1.0,-1.0])
+  nodes = theMesh.elem[theElement]
+  x = theMesh.X[nodes]
+  y = theMesh.Y[nodes]
+  dxdxsi = x @ dphidxsi
+  dxdeta = x @ dphideta
+  dydxsi = y @ dphidxsi
+  dydeta = y @ dphideta
+  jac = abs(dxdxsi*dydeta - dxdeta*dydxsi)
+  dphidx = (dphidxsi * dydeta - dphideta * dydxsi) / jac
+  dphidy = (dphideta * dxdxsi - dphidxsi * dxdeta) / jac
+  return [dphidx,dphidy,jac]
+
+def computeShapeEdge(theEdges,iEdge):
+  nodes = theEdges.edges[iEdge][0:2]
+  x = theEdges.mesh.X[nodes]
+  y = theEdges.mesh.Y[nodes]
+  dx = x[1] - x[0]
+  dy = y[1] - y[0]
+  jac = np.sqrt(dx*dx+dy*dy)
+  nx =  dy / jac
+  ny = -dx / jac
+  return[nx,ny,jac]
+
 
 def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
-  #inversion et euler explicite
 
+  #calcul des matrices
+  Counter=0
+  while Counter!= nIter:
+      #calcul des matrices
+      #inversion et euler explicite
+      MatU=np.zeros((len(U),3))
+      MatE=MatU
+      MatV=MatU
+      U = U+dt*MatU #euler explicite
+      V = V+dt*MatV
+      E = E+dt*MatE
 
 
   return [U,V,E]
+
+
+U = np.zeros([nElem,3])
+V = np.zeros([nElem,3])
+E=np.zeros([nElem,3])
+theResultFiles = "eta-%06d.txt"
+print(compute(theMeshFile,theResultFiles,U,V,E,1,8,4))
