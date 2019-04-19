@@ -109,7 +109,10 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
       U = U+dt*MatU #euler explicite
       V = V+dt*MatV
       E = E+dt*MatE
-
+      Counter+=1
+      #sauvegarde
+      #if (Counter % nSave == 0):
+          #writeResult(theResultFiles,Counter,E)
 
   return [U,V,E]
 
@@ -118,4 +121,4 @@ U = np.zeros([nElem,3])
 V = np.zeros([nElem,3])
 E=np.zeros([nElem,3])
 theResultFiles = "eta-%06d.txt"
-print(compute(theMeshFile,theResultFiles,U,V,E,1,8,4))
+print(compute(theMeshFile,theResultFiles,U,V,E,1,8,1))
