@@ -13,7 +13,7 @@ def readMesh(fileName) :
   Y = xyz[:,1]
   H = xyz[:,2]
   return [nNode,X,Y,H,nElem,elem]
-theMeshFile = "PacificTriangleFine.txt"
+theMeshFile = "/Users/thibaultblanpain/Documents/GitHub/meca1120_project_ThibaultBlanpain_and_RobbeCreelle/PacificTriangleTiny.txt"
 [nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
 
 # -------------------------------------------------------------------------

@@ -16,7 +16,7 @@ import tsunami as tsunami
 # -1- Lecture des données
 #
 
-theMeshFile = "PacificTriangleTiny.txt"
+theMeshFile = "/Users/thibaultblanpain/Documents/GitHub/meca1120_project_ThibaultBlanpain_and_RobbeCreelle/PacificTriangleTiny.txt"
 [nNode,X,Y,H,nElem,elem] = tsunami.readMesh(theMeshFile)
 print(" == Number of elements : %d " % nElem)
 print(" == Number of nodes    : %d " % nNode)
