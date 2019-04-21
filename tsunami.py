@@ -13,11 +13,8 @@ def readMesh(fileName) :
   Y = xyz[:,1]
   H = xyz[:,2]
   return [nNode,X,Y,H,nElem,elem]
-<<<<<<< HEAD
-theMeshFile = "/Users/thibaultblanpain/Documents/GitHub/meca1120_project_ThibaultBlanpain_and_RobbeCreelle/PacificTriangleTiny.txt"
-=======
+
 theMeshFile = "PacificTriangleTiny.txt"
->>>>>>> 131f326a102d405f2f0723af5980b9a35d45380e
 [nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
 
 # -------------------------------------------------------------------------
@@ -68,15 +65,21 @@ def interpollation2D(U,xsi,eta):
     return U[0]*xsi+U[1]*eta+U[2]*(np.ones(3)-xsi-eta)
 def interpollation1D(U,xsi):
     return 0.5*(U[0]*(1-xsi)+U[1]*(1+xsi))
-def bathymetrie(theMeshFile,ielem,xsi,eta):# renvoie une interpollation de la bathymetrie au point xsi eta
-    theMesh=readMesh(theMeshFile)
-    Nodes=elem[ielem]
-    return interpollation2D(H[Nodes],xsi,eta)
 
-def computeShapeTriangle(theMesh,theElement) :
+#classe pour the Mesh pour eviter la repetition de readMesh(theMeshFile)
+class Mesh(object):
+    def __init__(self,theMeshFile):
+        [self.nNode,self.X,self.Y,self.H,self.nElem,self.elem]=readMesh(theMeshFile)
+theMesh=Mesh(theMeshFile)
+def bathymetrie(theMesh,ielem,xsi,eta):# renvoie une interpollation de la bathymetrie au point xsi eta
+    [nNode,X,Y,H,nElem,elem]=readMesh(theMeshFile)
+    Nodes=theMesh.elem[ielem]
+    return interpollation2D(theMesh.H[Nodes],xsi,eta)
+
+def computeShapeTriangle(theMesh,Element) :#Element pas vectoriel malheureusement
   dphidxsi = np.array([ 1.0, 0.0,-1.0])
   dphideta = np.array([ 0.0, 1.0,-1.0])
-  nodes = theMesh.elem[theElement]
+  nodes = theMesh.elem[Element]
   x = theMesh.X[nodes]
   y = theMesh.Y[nodes]
   dxdxsi = x @ dphidxsi
@@ -87,14 +90,41 @@ def computeShapeTriangle(theMesh,theElement) :
   dphidx = (dphidxsi * dydeta - dphideta * dydxsi) / jac
   dphidy = (dphideta * dxdxsi - dphidxsi * dxdeta) / jac
   return [dphidx,dphidy,jac]
+# strategie pour creer des edges: 1) repertorier les aretes 2) enlever les doublons
+#3) classer Boundary et non Boundary
+class Edges(object):
+  def __init__(self,theMesh):
+    self.mesh=theMesh
+    self.nEdges = theMesh.nElem * 3
+    tab= -1*np.ones((self.nEdges,4),dtype='int')
+    for i in range(theMesh.nElem):
+        tab[3*i:3*i+4,2]=i
+        Tripoints=theMesh.elem[i]
+        tab[3*i,0:2]=Tripoints[0:2]
+        tab[3*i+1,0:2]=Tripoints[1:]
+        tab[3*i+2,0:2]=Tripoints[2],Tripoints[0]
+    self.edges=sorted(tab,key = lambda item: (min(item[0],item[1]),max(item[0],item[1])),reverse=True)
+    decal=0
+    for i in range(len(self.edges)-1):
+        if self.edges[i][0]==self.edges[i+1][1] and self.edges[i+1][0]==self.edges[i][1]:
+            decal+=1
+            self.edges[i][3]=self.edges[i+1][2]
+            self.edges[i+1]=[-2,-2,-2,-2]
+    self.edges=sorted(self.edges,key = lambda item: item[3],reverse=True)
+    n=self.nEdges
+    self.nEdges=n-decal
+    self.nBoundary=n-2*decal
+    self.edges=self.edges[0:self.nEdges]
+    self.edges=sorted(self.edges,key = lambda item: item[3])
+theEdges=Edges(theMesh)
+def computeShapeEdge(theEdges,iEdge):#iEdge non vectoriel malheureusement
 
-def computeShapeEdge(theEdges,iEdge):
   nodes = theEdges.edges[iEdge][0:2]
   x = theEdges.mesh.X[nodes]
   y = theEdges.mesh.Y[nodes]
   dx = x[1] - x[0]
   dy = y[1] - y[0]
-  jac = np.sqrt(dx*dx+dy*dy)
+  jac = np.sqrt(dx*dx+dy*dy)#longueur du segment (attention au 0.5)
   nx =  dy / jac
   ny = -dx / jac
   return[nx,ny,jac]
@@ -102,23 +132,32 @@ def computeShapeEdge(theEdges,iEdge):
 
 def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
 
+  [nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
+  theMesh=Mesh(theMeshFile)
+  theEdges=Edges(theMesh)
+
   #calcul des matrices
   Counter=0
+  Ainverse = np.array([[18.0,-6.0,-6.0],[-6.0,18.0,-6.0],[-6.0,-6.0,18.0]])
   while Counter!= nIter:
       #calcul des matrices
       #inversion et euler explicite
-      MatU=np.zeros((len(U),3))
-      MatE=MatU
-      MatV=MatU
-      U = U+dt*MatU #euler explicite
-      V = V+dt*MatV
-      E = E+dt*MatE
+      for iElem in range(nElem):
+
+
+          MatU=np.zeros((len(U),3))
+          MatE=MatU
+          MatV=MatU
+          U = U+dt*MatU #euler explicite
+          V = V+dt*MatV
+          E = E+dt*MatE
+
       Counter+=1
       #sauvegarde
       #if (Counter % nSave == 0):
           #writeResult(theResultFiles,Counter,E)
 
-  return [U,V,E]
+  return [U,V,E],Counter
 
 
 U = np.zeros([nElem,3])
