@@ -139,7 +139,7 @@ def idle():
 iter = 0; delta = 25;
 R = 6371220;
 BathMax = 9368;
-theMeshFile = "/Users/thibaultblanpain/Documents/GitHub/meca1120_project_ThibaultBlanpain_and_RobbeCreelle/PacificTriangleTiny.txt"
+theMeshFile = "PacificTriangleTiny.txt"
 theResultFiles = "results/eta-%06d.txt"
 theFlagBathymetry = False
 theMouse = 389

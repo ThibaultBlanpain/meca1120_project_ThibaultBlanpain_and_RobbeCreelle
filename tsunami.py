@@ -71,12 +71,12 @@ class Mesh(object):
     def __init__(self,theMeshFile):
         [self.nNode,self.X,self.Y,self.H,self.nElem,self.elem]=readMesh(theMeshFile)
 theMesh=Mesh(theMeshFile)
+
 def bathymetrie(theMesh,ielem,xsi,eta):# renvoie une interpollation de la bathymetrie au point xsi eta
-    [nNode,X,Y,H,nElem,elem]=readMesh(theMeshFile)
     Nodes=theMesh.elem[ielem]
     return interpollation2D(theMesh.H[Nodes],xsi,eta)
 
-def computeShapeTriangle(theMesh,Element) :#Element pas vectoriel malheureusement
+def computeShapeTriangle(theMesh,Element,jaco) :#Element pas vectoriel malheureusement
   dphidxsi = np.array([ 1.0, 0.0,-1.0])
   dphideta = np.array([ 0.0, 1.0,-1.0])
   nodes = theMesh.elem[Element]
@@ -86,10 +86,17 @@ def computeShapeTriangle(theMesh,Element) :#Element pas vectoriel malheureusemen
   dxdeta = x @ dphideta
   dydxsi = y @ dphidxsi
   dydeta = y @ dphideta
-  jac = abs(dxdxsi*dydeta - dxdeta*dydxsi)
-  dphidx = (dphidxsi * dydeta - dphideta * dydxsi) / jac
-  dphidy = (dphideta * dxdxsi - dphidxsi * dxdeta) / jac
-  return [dphidx,dphidy,jac]
+
+  dphidx = (dphidxsi * dydeta - dphideta * dydxsi) / jaco[Element]
+  dphidy = (dphideta * dxdxsi - dphidxsi * dxdeta) / jaco[Element]
+  return [dphidx,dphidy]
+def computeJacobian(theMesh):
+    X=theMesh.X
+    Y=theMesh.Y
+    elem=theMesh.elem
+    return abs((X[elem[:,2]]-X[elem[:,0]])*(Y[elem[:,1]]-Y[elem[:,0]])-(X[elem[:,1]]-X[elem[:,0]])*(Y[elem[:,2]]-Y[elem[:,0]]))
+
+
 # strategie pour creer des edges: 1) repertorier les aretes 2) enlever les doublons
 #3) classer Boundary et non Boundary
 class Edges(object):
@@ -116,7 +123,14 @@ class Edges(object):
     self.nBoundary=n-2*decal
     self.edges=self.edges[0:self.nEdges]
     self.edges=sorted(self.edges,key = lambda item: item[3])
+  def printf(self):
+
+      print("Number of edges %d" % self.nEdges)
+      print("Number of boundary edges %d" % self.nBoundary)
+      for i in range(self.nEdges):
+        print("%6d : %4d %4d : %4d %4d" % (i,*self.edges[i]))
 theEdges=Edges(theMesh)
+
 def computeShapeEdge(theEdges,iEdge):#iEdge non vectoriel malheureusement
 
   nodes = theEdges.edges[iEdge][0:2]
@@ -136,22 +150,35 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
   theMesh=Mesh(theMeshFile)
   theEdges=Edges(theMesh)
 
-  #calcul des matrices
+
   Counter=0
   Ainverse = np.array([[18.0,-6.0,-6.0],[-6.0,18.0,-6.0],[-6.0,-6.0,18.0]])
+  jaco=computeJacobian(theMesh)
+  #initialisation des matrices B
+  B_U=np.zeros((len(U),3))
+  B_V=B_U
+  B_E=B_U
+
   while Counter!= nIter:
-      #calcul des matrices
-      #inversion et euler explicite
+
+      #integrales de surfaces
       for iElem in range(nElem):
-
-
-          MatU=np.zeros((len(U),3))
-          MatE=MatU
-          MatV=MatU
-          U = U+dt*MatU #euler explicite
-          V = V+dt*MatV
-          E = E+dt*MatE
-
+          continue
+      # integrales des edges interieures
+      for iEdge in range(theEdges.nBoundary,theEdges.nEdges):
+          continue
+      for iEdgeB in range(theEdges.nBoundary):
+          continue
+      #inversion des matrices
+      for iElem in range(nElem):
+         
+          B_U[iElem] +=Ainverse@B_U[iElem]/jaco[iElem]# nx3= 3x3 @ nx1
+          B_V[iElem] +=Ainverse@B_V[iElem]/jaco[iElem]
+          B_E[iElem] += Ainverse@B_E[iElem]/jaco[iElem]
+      # euler explicite
+      U+= dt*B_U
+      V+= dt*B_V
+      E+= dt*B_E
       Counter+=1
       #sauvegarde
       #if (Counter % nSave == 0):
