@@ -193,32 +193,40 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
           B_V[iElem] += ((g*y*n_elev)*weight)@phi /jaco[iElem]*1/(2*R**2)#7 meme que 4
           B_V[iElem] += sum (np.outer(g*n_elev*bigR,dphidy)*weight*jaco[iElem])#8 idem que 5
       # integrales des edges interieures
+      B_U=np.ravel(B_U)
+      B_V=np.ravel(B_V)
+      B_E=np.ravel(B_E)
       for iEdge in range(theEdges.nBoundary,theEdges.nEdges):
           continue
       # integrales des edges frontieres
       for iEdgeB in range(theEdges.nBoundary):
           continue
+      #remise en nx3
+      B_U=np.reshape(B_U,(nElem,3))
+      B_V=np.reshape(B_V,(nElem,3))
+      B_E=np.reshape(B_E,(nElem,3))
       #inversion des matrices
       for iElem in range(nElem):
           B_U[iElem] +=Ainverse@B_U[iElem]/jaco[iElem]# nx3= 3x3 @ nx1
           B_V[iElem] +=Ainverse@B_V[iElem]/jaco[iElem]
           B_E[iElem] += Ainverse@B_E[iElem]/jaco[iElem]
+
       # euler explicite
       U+= dt*B_U
       V+= dt*B_V
       E+= dt*B_E
       Counter+=1
       #sauvegarde
-      if (Counter % nSave == 0):
-          writeResult(theResultFiles,Counter,E)
+      #if (Counter % nSave == 0):
+          #writeResult(theResultFiles,Counter,E)
 
   return [U,V,E]
 
 
-#U = np.ones([nElem,3])
-#V = np.zeros([nElem,3])
-#E=np.zeros([nElem,3])
-#E[3:100,:]=1
-#theResultFiles = "eta-%06d.txt"
-#print(compute(theMeshFile,theResultFiles,U,V,E,1,1,20))
+U = np.ones([nElem,3])
+V = np.zeros([nElem,3])
+E=np.zeros([nElem,3])
+E[3:100,:]=1
+theResultFiles = "eta-%06d.txt"
+print(compute(theMeshFile,theResultFiles,U,V,E,1,1,20))
 #impositions des conditions aux frontieres1: E gauche = E droite  et vitesse a gauche = -1*vitesse a droite(pour U,V)
