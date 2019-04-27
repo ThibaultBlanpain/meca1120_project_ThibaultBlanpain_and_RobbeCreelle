@@ -86,7 +86,6 @@ def computeShapeTriangle(theMesh,Element,jaco) :#Element pas vectoriel malheureu
   dxdeta = x @ dphideta
   dydxsi = y @ dphidxsi
   dydeta = y @ dphideta
-
   dphidx = (dphidxsi * dydeta - dphideta * dydxsi) / jaco[Element]
   dphidy = (dphideta * dxdxsi - dphidxsi * dxdeta) / jaco[Element]
   return [dphidx,dphidy]
@@ -123,12 +122,7 @@ class Edges(object):
     self.nBoundary=n-2*decal
     self.edges=self.edges[0:self.nEdges]
     self.edges=sorted(self.edges,key = lambda item: item[3])
-  def printf(self):
 
-      print("Number of edges %d" % self.nEdges)
-      print("Number of boundary edges %d" % self.nBoundary)
-      for i in range(self.nEdges):
-        print("%6d : %4d %4d : %4d %4d" % (i,*self.edges[i]))
 theEdges=Edges(theMesh)
 
 def computeShapeEdge(theEdges,iEdge):#iEdge non vectoriel malheureusement
@@ -145,33 +139,67 @@ def computeShapeEdge(theEdges,iEdge):#iEdge non vectoriel malheureusement
 
 
 def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
+  R = 6371220
+  omega= 2*np.pi/86400
+  gamma=10**-7
+  g=9.81
 
   [nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
   theMesh=Mesh(theMeshFile)
   theEdges=Edges(theMesh)
 
-
   Counter=0
   Ainverse = np.array([[18.0,-6.0,-6.0],[-6.0,18.0,-6.0],[-6.0,-6.0,18.0]])
   jaco=computeJacobian(theMesh)
+  #interation rule 2D
+  xsi=np.array([0.166666666666667,0.666666666666667,0.166666666666667])
+  eta=np.array([0.166666666666667,0.166666666666667,0.666666666666667])
+  weight=np.array([0.166666666666667,0.166666666666667,0.166666666666667])
+  #integration 1D
+  xsi1D=np.array([-0.5773502691896257, 0.5773502691896257])
+  weight1D=np.array([1.0,1.0])
+  #fonctions de formes
+  phi= np.array([1-xsi-eta,xsi,eta])
+  phi1D= np.asarray([1.0-xsi1D,1.0+xsi1D])/ 2
   #initialisation des matrices B
-  B_U=np.zeros((len(U),3))
-  B_V=B_U
-  B_E=B_U
+
 
   while Counter!= nIter:
-
+      B_U=np.zeros((len(U),3))
+      B_V=np.zeros((len(U),3))
+      B_E=np.zeros((len(U),3))
       #integrales de surfaces
       for iElem in range(nElem):
-          continue
+          h=bathymetrie(theMesh,iElem,xsi,eta)
+          u=interpollation2D(U[iElem],xsi,eta)
+          v=interpollation2D(V[iElem],xsi,eta)
+          x=interpollation2D(theMesh.X[elem[iElem]],xsi,eta)
+          y=interpollation2D(theMesh.Y[elem[iElem]],xsi,eta)
+          [dphidx,dphidy] =computeShapeTriangle(theMesh,iElem,jaco)
+          bigR= (4*R**2+x**2+y**2)/(4*R**2)
+
+          B_E[iElem] += sum( (np.outer(u*h*bigR,dphidx) + np.outer(v*h*bigR,dphidy)) * weight *jaco[iElem]) #1
+          B_E[iElem] += ((h*(x*u+y*v)/(R**2))*weight)@ phi/jaco[iElem] #2
+
+          f=2*omega*np.sin(y/bigR)
+
+          B_U[iElem] += ((f*v-gamma*u)*weight)@ phi /jaco[iElem]#3
+          n_elev=interpollation2D(E[iElem],xsi,eta)# n_elev=H-h
+
+          B_U[iElem] += ((g*x*n_elev)*weight)@phi /jaco[iElem]*1/(2*R**2)#4
+          B_U[iElem] += sum (np.outer(g*n_elev*bigR,dphidx)*weight*jaco[iElem])#5
+
+          B_V[iElem] += ((-1*f*v-gamma*u)*weight)@ phi *jaco[iElem]#idem 6 que 3
+          B_V[iElem] += ((g*y*n_elev)*weight)@phi /jaco[iElem]*1/(2*R**2)#7 meme que 4
+          B_V[iElem] += sum (np.outer(g*n_elev*bigR,dphidy)*weight*jaco[iElem])#8 idem que 5
       # integrales des edges interieures
       for iEdge in range(theEdges.nBoundary,theEdges.nEdges):
           continue
+      # integrales des edges frontieres
       for iEdgeB in range(theEdges.nBoundary):
           continue
       #inversion des matrices
       for iElem in range(nElem):
-         
           B_U[iElem] +=Ainverse@B_U[iElem]/jaco[iElem]# nx3= 3x3 @ nx1
           B_V[iElem] +=Ainverse@B_V[iElem]/jaco[iElem]
           B_E[iElem] += Ainverse@B_E[iElem]/jaco[iElem]
@@ -181,14 +209,16 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
       E+= dt*B_E
       Counter+=1
       #sauvegarde
-      #if (Counter % nSave == 0):
-          #writeResult(theResultFiles,Counter,E)
+      if (Counter % nSave == 0):
+          writeResult(theResultFiles,Counter,E)
 
-  return [U,V,E],Counter
+  return [U,V,E]
 
 
-U = np.zeros([nElem,3])
-V = np.zeros([nElem,3])
-E=np.zeros([nElem,3])
-theResultFiles = "eta-%06d.txt"
-print(compute(theMeshFile,theResultFiles,U,V,E,1,8,1))
+#U = np.ones([nElem,3])
+#V = np.zeros([nElem,3])
+#E=np.zeros([nElem,3])
+#E[3:100,:]=1
+#theResultFiles = "eta-%06d.txt"
+#print(compute(theMeshFile,theResultFiles,U,V,E,1,1,20))
+#impositions des conditions aux frontieres1: E gauche = E droite  et vitesse a gauche = -1*vitesse a droite(pour U,V)

@@ -16,11 +16,8 @@ import tsunami as tsunami
 # -1- Lecture des données
 #
 
-<<<<<<< HEAD
-theMeshFile = "/Users/thibaultblanpain/Documents/GitHub/meca1120_project_ThibaultBlanpain_and_RobbeCreelle/PacificTriangleTiny.txt"
-=======
+
 theMeshFile = "PacificTriangleTiny.txt"
->>>>>>> 131f326a102d405f2f0723af5980b9a35d45380e
 [nNode,X,Y,H,nElem,elem] = tsunami.readMesh(theMeshFile)
 print(" == Number of elements : %d " % nElem)
 print(" == Number of nodes    : %d " % nNode)
@@ -52,7 +49,7 @@ tsunami.writeResult(theResultFiles,0,E)
 U = np.zeros([nElem,3])
 V = np.zeros([nElem,3])
 E = tsunami.readResult(theResultFiles,0,nElem)
-dt = 0.1; nIter = 100; nSave = 25
+dt = 0.1; nIter = 100; nSave = 50
 [U,V,E] = tsunami.compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave)
 
 for iElem in [27,28] :
