@@ -1,21 +1,9 @@
-# -------------------------------------------------------------------------
-#
-# PYTHON for FEM DUMMIES 18-19
-# Projet "tsunami"
-#
-# Script de test
-#  Vincent Legat
-#
-# -------------------------------------------------------------------------
-#
-
 import numpy as np
 import tsunami as tsunami
 
 #
 # -1- Lecture des données
 #
-
 
 theMeshFile = "PacificTriangleTiny.txt"
 [nNode,X,Y,H,nElem,elem] = tsunami.readMesh(theMeshFile)
@@ -49,7 +37,7 @@ tsunami.writeResult(theResultFiles,0,E)
 U = np.zeros([nElem,3])
 V = np.zeros([nElem,3])
 E = tsunami.readResult(theResultFiles,0,nElem)
-dt = 0.1; nIter = 100; nSave = 50
+dt = 0.1; nIter = 100; nSave = 25
 [U,V,E] = tsunami.compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave)
 
 for iElem in [27,28] :

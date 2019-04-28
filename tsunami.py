@@ -1,8 +1,5 @@
-
 import numpy as np
-
 # -------------------------------------------------------------------------
-
 def readMesh(fileName) :
   with open(fileName,"r") as f :
     nNode = int(f.readline().split()[3])
@@ -16,9 +13,7 @@ def readMesh(fileName) :
 
 theMeshFile = "PacificTriangleTiny.txt"
 [nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
-
 # -------------------------------------------------------------------------
-
 def readResult(fileBaseName,iter,nElem) :
   fileName = fileBaseName % iter
   with open(fileName,"r") as f :
@@ -28,9 +23,7 @@ def readResult(fileBaseName,iter,nElem) :
     E = np.array(list(list(float(w) for w in f.readline().split()[2:5]) for i in range(nElem)))
     print(" === iteration %6d : reading %s ===" % (iter,fileName))
   return E
-
 # -------------------------------------------------------------------------
-
 def writeResult(fileBaseName,iter,E) :
   fileName = fileBaseName % iter
   nElem = E.shape[0]
@@ -95,7 +88,6 @@ def computeJacobian(theMesh):
     elem=theMesh.elem
     return abs((X[elem[:,2]]-X[elem[:,0]])*(Y[elem[:,1]]-Y[elem[:,0]])-(X[elem[:,1]]-X[elem[:,0]])*(Y[elem[:,2]]-Y[elem[:,0]]))
 
-
 # strategie pour creer des edges: 1) repertorier les aretes 2) enlever les doublons
 #3) classer Boundary et non Boundary
 class Edges(object):
@@ -122,11 +114,25 @@ class Edges(object):
     self.nBoundary=n-2*decal
     self.edges=self.edges[0:self.nEdges]
     self.edges=sorted(self.edges,key = lambda item: item[3])
+    self.mapEdgeLeft = np.zeros((self.nEdges,2),dtype=np.int)
+    self.mapEdgeRight = np.zeros((self.nEdges,2),dtype=np.int)
+    for iEdge in range(self.nBoundary,self.nEdges):
+      myEdge = self.edges[iEdge]
+      elementLeft  = myEdge[2]
+      elementRight = myEdge[3]
+      nodesLeft    = self.mesh.elem[elementLeft]
+      nodesRight   = self.mesh.elem[elementRight]
+      self.mapEdgeLeft[iEdge,:]  = [3*elementLeft  + np.nonzero(nodesLeft  == myEdge[j])[0][0] for j in range(2)]
+      self.mapEdgeRight[iEdge,:] = [3*elementRight + np.nonzero(nodesRight == myEdge[j])[0][0] for j in range(2)]
+    for iEdgeB in range(self.nBoundary):
+      myEdge = self.edges[iEdgeB]
+      elementLeft  = myEdge[2]
+      nodesLeft    = self.mesh.elem[elementLeft]
+      self.mapEdgeLeft[iEdgeB,:]  = [3*elementLeft  + np.nonzero(nodesLeft  == myEdge[j])[0][0] for j in range(2)]
 
 theEdges=Edges(theMesh)
 
 def computeShapeEdge(theEdges,iEdge):#iEdge non vectoriel malheureusement
-
   nodes = theEdges.edges[iEdge][0:2]
   x = theEdges.mesh.X[nodes]
   y = theEdges.mesh.Y[nodes]
@@ -136,7 +142,6 @@ def computeShapeEdge(theEdges,iEdge):#iEdge non vectoriel malheureusement
   nx =  dy / jac
   ny = -dx / jac
   return[nx,ny,jac]
-
 
 def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
   R = 6371220
@@ -161,13 +166,12 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
   #fonctions de formes
   phi= np.array([1-xsi-eta,xsi,eta])
   phi1D= np.asarray([1.0-xsi1D,1.0+xsi1D])/ 2
-  #initialisation des matrices B
-
 
   while Counter!= nIter:
+      #initialisation des matrices B
       B_U=np.zeros((len(U),3))
-      B_V=np.zeros((len(U),3))
-      B_E=np.zeros((len(U),3))
+      B_V=np.zeros((len(V),3))
+      B_E=np.zeros((len(E),3))
       #integrales de surfaces
       for iElem in range(nElem):
           h=bathymetrie(theMesh,iElem,xsi,eta)
@@ -197,19 +201,57 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
       B_V=np.ravel(B_V)
       B_E=np.ravel(B_E)
       for iEdge in range(theEdges.nBoundary,theEdges.nEdges):
-          continue
+          mapLeft=theEdges.mapEdgeLeft[iEdge]
+          mapRight=theEdges.mapEdgeRight[iEdge]
+          [nx,ny,jac]=computeShapeEdge(theEdges,iEdge)
+          nx,ny= -1*nx,-1*ny # car c est une normal entrante
+          x=interpollation1D(theMesh.X[theEdges.edges[iEdge][0:2]],xsi1D)
+          y=interpollation1D(theMesh.Y[theEdges.edges[iEdge][0:2]],xsi1D)
+          h=interpollation1D(theMesh.H[theEdges.edges[iEdge][0:2]],xsi1D)
+          bigR=(4*R**2+x**2+y**2)/(4*R**2)
+          #calcul de u star et de e_star
+          u_l=np.array([U[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],U[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
+          u_r=np.array([U[(mapRight[0]/3).astype(int)][mapRight[0]%3],U[(mapRight[1]/3).astype(int)][mapRight[1]%3]])
+          e_l=np.array([E[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],E[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
+          e_r=np.array([E[(mapRight[0]/3).astype(int)][mapRight[0]%3],E[(mapRight[1]/3).astype(int)][mapRight[1]%3]])
+          u_star=0.5*(u_l+u_r)+np.sqrt(g/h)*0.5*(e_l-e_r)
+          e_star=0.5*(e_l+e_r)+np.sqrt(h/g)*0.5*(u_l-u_r)
+          #remplissage de B
+          B_E[mapLeft] += (weight1D*u_star*h*bigR)@phi1D*0.5*jac
+          B_E[mapRight] -= (weight1D*u_star*h*bigR)@phi1D*0.5*jac #9
+
+          B_U[mapLeft] += nx*g*(weight1D*e_star)@phi1D*0.5*jac
+          B_U[mapRight] -= nx*g*(weight1D*e_star)@phi1D*0.5*jac #10
+
+          B_V[mapLeft] += ny*g*(weight1D*e_star)@phi1D*0.5*jac
+          B_V[mapRight] -= ny*g*(weight1D*e_star)@phi1D*0.5*jac #11 idem que 10
+
       # integrales des edges frontieres
+
       for iEdgeB in range(theEdges.nBoundary):
-          continue
+           mapLeft=theEdges.mapEdgeLeft[iEdgeB]
+           [nx,ny,jac]=computeShapeEdge(theEdges,iEdgeB)
+           nx,ny= -1*nx,-1*ny # car c est une normal entrante
+           x=interpollation1D(theMesh.X[theEdges.edges[iEdgeB][0:2]],xsi1D)
+           y=interpollation1D(theMesh.Y[theEdges.edges[iEdgeB][0:2]],xsi1D)
+           h=interpollation1D(theMesh.H[theEdges.edges[iEdgeB][0:2]],xsi1D)
+           bigR=(4*R**2+x**2+y**2)/(4*R**2)
+           #calcul de e_star (u_star=0)
+           u_l=np.array([U[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],U[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
+           e_l=np.array([E[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],E[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
+           e_star= e_l+np.sqrt(h/g)*u_l
+           #remplissage des matrice B #12=0 car u_star=0
+           B_U[mapLeft] += nx*g*(weight1D*e_star)@phi1D*0.5*jac#13
+           B_V[mapLeft] += ny*g*(weight1D*e_star)@phi1D*0.5*jac#14
       #remise en nx3
       B_U=np.reshape(B_U,(nElem,3))
       B_V=np.reshape(B_V,(nElem,3))
       B_E=np.reshape(B_E,(nElem,3))
       #inversion des matrices
       for iElem in range(nElem):
-          B_U[iElem] +=Ainverse@B_U[iElem]/jaco[iElem]# nx3= 3x3 @ nx1
-          B_V[iElem] +=Ainverse@B_V[iElem]/jaco[iElem]
-          B_E[iElem] += Ainverse@B_E[iElem]/jaco[iElem]
+          B_U[iElem] =Ainverse@B_U[iElem]/jaco[iElem]# nx3= 3x3 @ nx1
+          B_V[iElem] =Ainverse@B_V[iElem]/jaco[iElem]
+          B_E[iElem] = Ainverse@B_E[iElem]/jaco[iElem]
 
       # euler explicite
       U+= dt*B_U
@@ -219,7 +261,6 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
       #sauvegarde
       #if (Counter % nSave == 0):
           #writeResult(theResultFiles,Counter,E)
-
   return [U,V,E]
 
 
