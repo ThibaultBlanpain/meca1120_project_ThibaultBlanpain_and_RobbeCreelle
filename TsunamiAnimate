@@ -1,3 +1,16 @@
+#
+# PYTHON for FEM DUMMIES 18-19
+# Projet "tsunami"
+#
+# Visualisation des résultats : OpenGL old-fashion
+# Une implémentation avec des shaders sera présentée en S11
+#
+#  Vincent Legat
+#
+# -------------------------------------------------------------------------
+#
+
+
 from OpenGL.GL   import *
 from OpenGL.GLU  import *
 from OpenGL.GLUT import *
@@ -123,11 +136,11 @@ def idle():
 
 # -------------------------------------------------------------------------
 
-iter = 0; delta = 1;
+iter = 0; delta = 25;
 R = 6371220;
 BathMax = 9368;
-theMeshFile = "PacificTriangleSmall.txt"
-theResultFiles = "eta-%06d.txt"
+theMeshFile = "PacificTriangleFine.txt"
+theResultFiles = "results/eta-%06d.txt"
 theFlagBathymetry = False
 theMouse = 389
 theRatio = 1.0

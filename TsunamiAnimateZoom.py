@@ -1,3 +1,16 @@
+#
+# PYTHON for FEM DUMMIES 18-19
+# Projet "tsunami"
+#
+# Visualisation des résultats : OpenGL old-fashion
+# Une implémentation avec des shaders sera présentée en S11
+#
+#  Vincent Legat
+#
+# -------------------------------------------------------------------------
+#
+
+
 from OpenGL.GL   import *
 from OpenGL.GLU  import *
 from OpenGL.GLUT import *
@@ -12,21 +25,23 @@ def draw():
   global E,theFlagBathymetry,theMouse,theRatio
 
   glClearColor( 0.9, 0.9, 0.8, 0.0 );
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  glMatrixMode(GL_PROJECTION);
-  glLoadIdentity();
-  gluPerspective(65.0,theRatio,1.0,100.0);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+  glMatrixMode(GL_PROJECTION)
+  glLoadIdentity()
+  gluPerspective(65.0,theRatio,1.0,100.0)
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
-  gluLookAt(0.0,1.0,0.0,0.0,20.0,0.0,0.0,0.0,1.0);
-  glTranslatef(0.0,14.0,0.0);
-  glRotatef(0.3*theMouse,0.0,0.0,1.0);
+  gluLookAt(0.0,1.0,0.0,0.0,20.0,0.0,0.0,0.0,1.0)
+  glTranslatef(0.0,8.6,0.0)
+  glRotatef(0.3*theMouse,0.0,0.0,1.0)
+  glRotatef(-40,0.0,1.0,0.0)
 
-  quadratic = gluNewQuadric();
-  gluQuadricNormals(quadratic, GLU_SMOOTH);
-  glColor3f(1.0,1.0,1.0);
-  gluSphere(quadratic,5.95,400,200);
+
+  quadratic = gluNewQuadric()
+  gluQuadricNormals(quadratic, GLU_SMOOTH)
+  glColor3f(1.0,1.0,1.0)
+  gluSphere(quadratic,5.95,400,200)
 
   n = 9*nElem
   index  = np.ravel(elem)
@@ -126,10 +141,10 @@ def idle():
 iter = 0; delta = 1;
 R = 6371220;
 BathMax = 9368;
-theMeshFile = "PacificTriangleSmall.txt"
-theResultFiles = "eta-%06d.txt"
+theMeshFile = "PacificTiny.txt"
+theResultFiles = "etazoom-%06d.txt"
 theFlagBathymetry = False
-theMouse = 389
+theMouse = 384
 theRatio = 1.0
 
 glutInit(sys.argv)
@@ -186,5 +201,3 @@ except FileNotFoundError:
   E = np.zeros([nElem,3])
 
 glutMainLoop()
-
-# -------------------------------------------------------------------------

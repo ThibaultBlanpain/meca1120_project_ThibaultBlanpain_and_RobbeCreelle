@@ -11,8 +11,7 @@ def readMesh(fileName) :
   H = xyz[:,2]
   return [nNode,X,Y,H,nElem,elem]
 
-theMeshFile = "PacificTriangleTiny.txt"
-[nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
+
 # -------------------------------------------------------------------------
 def readResult(fileBaseName,iter,nElem) :
   fileName = fileBaseName % iter
@@ -30,7 +29,8 @@ def writeResult(fileBaseName,iter,E) :
   with open(fileName,"w") as f :
     f.write("Number of elements %d\n" % nElem)
     for i in range(nElem):
-      f.write("%6d : %14.7e %14.7e %14.7e\n" % (i,*E[i,:]))
+      f.write("%6d : %14.7e %14.7e %14.7e \n" % (i,*E[i,:]))
+
     print(" === iteration %6d : writing %s ===" % (iter,fileName))
 
 # -------------------------------------------------------------------------
@@ -63,15 +63,15 @@ def interpollation1D(U,xsi):
 class Mesh(object):
     def __init__(self,theMeshFile):
         [self.nNode,self.X,self.Y,self.H,self.nElem,self.elem]=readMesh(theMeshFile)
-theMesh=Mesh(theMeshFile)
+
 
 def bathymetrie(theMesh,ielem,xsi,eta):# renvoie une interpollation de la bathymetrie au point xsi eta
     Nodes=theMesh.elem[ielem]
     return interpollation2D(theMesh.H[Nodes],xsi,eta)
 
 def computeShapeTriangle(theMesh,Element,jaco) :#Element pas vectoriel malheureusement
-  dphidxsi = np.array([ 1.0, 0.0,-1.0])
-  dphideta = np.array([ 0.0, 1.0,-1.0])
+  dphidxsi = np.array([ 1.0, 0.0,-1.0])# attention a l'orientation
+  dphideta = np.array([ 0.0, 1.0,-1.0])#ttention a l'orientation
   nodes = theMesh.elem[Element]
   x = theMesh.X[nodes]
   y = theMesh.Y[nodes]
@@ -129,8 +129,11 @@ class Edges(object):
       elementLeft  = myEdge[2]
       nodesLeft    = self.mesh.elem[elementLeft]
       self.mapEdgeLeft[iEdgeB,:]  = [3*elementLeft  + np.nonzero(nodesLeft  == myEdge[j])[0][0] for j in range(2)]
-
-theEdges=Edges(theMesh)
+  def printf(self):
+    print("Number of edges %d" % self.nEdges)
+    print("Number of boundary edges %d" % self.nBoundary)
+    for i in range(self.nEdges):
+        print("%6d : %4d %4d : %4d %4d" % (i,*self.edges[i]))
 
 def computeShapeEdge(theEdges,iEdge):#iEdge non vectoriel malheureusement
   nodes = theEdges.edges[iEdge][0:2]
@@ -157,6 +160,7 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
   Ainverse = np.array([[18.0,-6.0,-6.0],[-6.0,18.0,-6.0],[-6.0,-6.0,18.0]])
   jaco=computeJacobian(theMesh)
   #interation rule 2D
+
   xsi=np.array([0.166666666666667,0.666666666666667,0.166666666666667])
   eta=np.array([0.166666666666667,0.166666666666667,0.666666666666667])
   weight=np.array([0.166666666666667,0.166666666666667,0.166666666666667])
@@ -166,12 +170,15 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
   #fonctions de formes
   phi= np.array([1-xsi-eta,xsi,eta])
   phi1D= np.asarray([1.0-xsi1D,1.0+xsi1D])/ 2
-
+  #initialisation des matrices B
+  B_U=np.zeros((len(U),3))
+  B_V=np.zeros((len(V),3))
+  B_E=np.zeros((len(E),3))
   while Counter!= nIter:
-      #initialisation des matrices B
-      B_U=np.zeros((len(U),3))
-      B_V=np.zeros((len(V),3))
-      B_E=np.zeros((len(E),3))
+      #remise a zero des matrices B
+      B_U[:,:]=0
+      B_V[:,:]=0
+      B_E[:,:]=0
       #integrales de surfaces
       for iElem in range(nElem):
           h=bathymetrie(theMesh,iElem,xsi,eta)
@@ -183,66 +190,77 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
           bigR= (4*R**2+x**2+y**2)/(4*R**2)
 
           B_E[iElem] += sum( (np.outer(u*h*bigR,dphidx) + np.outer(v*h*bigR,dphidy)) * weight *jaco[iElem]) #1
-          B_E[iElem] += ((h*(x*u+y*v)/(R**2))*weight)@ phi/jaco[iElem] #2
+          B_E[iElem] += ((h*(x*u+y*v)/(R**2))*weight)@ phi*jaco[iElem] #2
 
-          f=2*omega*np.sin(y/bigR)
+          f=2*omega*(4*R**2-x**2-y**2)/(4*R**2+x**2+y**2)
 
-          B_U[iElem] += ((f*v-gamma*u)*weight)@ phi /jaco[iElem]#3
+          B_U[iElem] += ((f*v-gamma*u)*weight)@ phi *jaco[iElem]#3
           n_elev=interpollation2D(E[iElem],xsi,eta)# n_elev=H-h
 
-          B_U[iElem] += ((g*x*n_elev)*weight)@phi /jaco[iElem]*1/(2*R**2)#4
+          B_U[iElem] += ((g*x*n_elev)*weight)@phi *jaco[iElem]*1/(2*R**2)#4
           B_U[iElem] += sum (np.outer(g*n_elev*bigR,dphidx)*weight*jaco[iElem])#5
 
-          B_V[iElem] += ((-1*f*v-gamma*u)*weight)@ phi *jaco[iElem]#idem 6 que 3
-          B_V[iElem] += ((g*y*n_elev)*weight)@phi /jaco[iElem]*1/(2*R**2)#7 meme que 4
+          B_V[iElem] += ((-1*f*u-gamma*v)*weight)@ phi *jaco[iElem]#idem 6 que 3
+          B_V[iElem] += ((g*y*n_elev)*weight)@phi *jaco[iElem]*1/(2*R**2)#7 meme que 4
           B_V[iElem] += sum (np.outer(g*n_elev*bigR,dphidy)*weight*jaco[iElem])#8 idem que 5
       # integrales des edges interieures
       B_U=np.ravel(B_U)
       B_V=np.ravel(B_V)
       B_E=np.ravel(B_E)
+      Counter2=0
       for iEdge in range(theEdges.nBoundary,theEdges.nEdges):
           mapLeft=theEdges.mapEdgeLeft[iEdge]
+
           mapRight=theEdges.mapEdgeRight[iEdge]
           [nx,ny,jac]=computeShapeEdge(theEdges,iEdge)
-          nx,ny= -1*nx,-1*ny # car c est une normal entrante
+          nx,ny= nx,ny # car c est une normal entrante
           x=interpollation1D(theMesh.X[theEdges.edges[iEdge][0:2]],xsi1D)
           y=interpollation1D(theMesh.Y[theEdges.edges[iEdge][0:2]],xsi1D)
           h=interpollation1D(theMesh.H[theEdges.edges[iEdge][0:2]],xsi1D)
+
           bigR=(4*R**2+x**2+y**2)/(4*R**2)
           #calcul de u star et de e_star
+          #il faut interpoller u_l, u_r,v_l,v_r
           u_l=np.array([U[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],U[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
+          v_l= np.array([V[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],V[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
+          uv_l=u_l@phi1D*nx+v_l@phi1D*ny
           u_r=np.array([U[(mapRight[0]/3).astype(int)][mapRight[0]%3],U[(mapRight[1]/3).astype(int)][mapRight[1]%3]])
+          v_r=np.array([V[(mapRight[0]/3).astype(int)][mapRight[0]%3],V[(mapRight[1]/3).astype(int)][mapRight[1]%3]])
+          uv_r=u_r@phi1D*nx+v_r@phi1D*ny
           e_l=np.array([E[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],E[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
           e_r=np.array([E[(mapRight[0]/3).astype(int)][mapRight[0]%3],E[(mapRight[1]/3).astype(int)][mapRight[1]%3]])
-          u_star=0.5*(u_l+u_r)+np.sqrt(g/h)*0.5*(e_l-e_r)
-          e_star=0.5*(e_l+e_r)+np.sqrt(h/g)*0.5*(u_l-u_r)
+          u_star=0.5*(uv_l+uv_r)+np.sqrt(g/h)*0.5*(e_l@phi1D-e_r@phi1D)
+          e_star=0.5*(e_l@phi1D+e_r@phi1D)+np.sqrt(h/g)*0.5*(uv_l-uv_r)# @phi1D pour interpoller
           #remplissage de B
-          B_E[mapLeft] += (weight1D*u_star*h*bigR)@phi1D*0.5*jac
-          B_E[mapRight] -= (weight1D*u_star*h*bigR)@phi1D*0.5*jac #9
+          B_E[mapLeft] -= (weight1D*u_star*h*bigR)@phi1D*0.5*jac
+          B_E[mapRight] += (weight1D*u_star*h*bigR)@phi1D*0.5*jac #9
 
-          B_U[mapLeft] += nx*g*(weight1D*e_star)@phi1D*0.5*jac
-          B_U[mapRight] -= nx*g*(weight1D*e_star)@phi1D*0.5*jac #10
+          B_U[mapLeft] -= nx*g*(weight1D*e_star*bigR)@phi1D*0.5*jac
+          B_U[mapRight] += nx*g*(weight1D*e_star*bigR)@phi1D*0.5*jac #10
 
-          B_V[mapLeft] += ny*g*(weight1D*e_star)@phi1D*0.5*jac
-          B_V[mapRight] -= ny*g*(weight1D*e_star)@phi1D*0.5*jac #11 idem que 10
+          B_V[mapLeft] -= ny*g*(weight1D*e_star*bigR)@phi1D*0.5*jac
+          B_V[mapRight] += ny*g*(weight1D*e_star*bigR)@phi1D*0.5*jac #11 idem que 10
 
       # integrales des edges frontieres
 
       for iEdgeB in range(theEdges.nBoundary):
            mapLeft=theEdges.mapEdgeLeft[iEdgeB]
            [nx,ny,jac]=computeShapeEdge(theEdges,iEdgeB)
-           nx,ny= -1*nx,-1*ny # car c est une normal entrante
+           nx,ny= nx,ny # car c est une normal entrante
            x=interpollation1D(theMesh.X[theEdges.edges[iEdgeB][0:2]],xsi1D)
            y=interpollation1D(theMesh.Y[theEdges.edges[iEdgeB][0:2]],xsi1D)
            h=interpollation1D(theMesh.H[theEdges.edges[iEdgeB][0:2]],xsi1D)
            bigR=(4*R**2+x**2+y**2)/(4*R**2)
            #calcul de e_star (u_star=0)
            u_l=np.array([U[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],U[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
+           v_l=np.array([V[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],V[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
            e_l=np.array([E[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],E[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
-           e_star= e_l+np.sqrt(h/g)*u_l
+           uv_l=u_l@phi1D*nx+v_l@phi1D*ny
+           e_star= e_l@phi1D+np.sqrt(h/g)*1*uv_l
+
            #remplissage des matrice B #12=0 car u_star=0
-           B_U[mapLeft] += nx*g*(weight1D*e_star)@phi1D*0.5*jac#13
-           B_V[mapLeft] += ny*g*(weight1D*e_star)@phi1D*0.5*jac#14
+           B_U[mapLeft] -= nx*g*(weight1D*e_star*bigR)@phi1D*0.5*jac#13
+           B_V[mapLeft] -= ny*g*(weight1D*e_star*bigR)@phi1D*0.5*jac#14
       #remise en nx3
       B_U=np.reshape(B_U,(nElem,3))
       B_V=np.reshape(B_V,(nElem,3))
@@ -259,15 +277,24 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
       E+= dt*B_E
       Counter+=1
       #sauvegarde
-      #if (Counter % nSave == 0):
-          #writeResult(theResultFiles,Counter,E)
+      if (Counter % nSave == 0):
+          writeResult(theResultFiles,Counter,E)
+          print("max value", np.max(E))
+          #print(" == Elevations for element %d : %14.7e %14.7e %14.7e " % (27,*E[27][:]) )
   return [U,V,E]
 
 
-U = np.ones([nElem,3])
-V = np.zeros([nElem,3])
-E=np.zeros([nElem,3])
-E[3:100,:]=1
-theResultFiles = "eta-%06d.txt"
-print(compute(theMeshFile,theResultFiles,U,V,E,1,1,20))
-#impositions des conditions aux frontieres1: E gauche = E droite  et vitesse a gauche = -1*vitesse a droite(pour U,V)
+
+#theMeshFile = "PacificTriangleTiny.txt"
+#[nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
+#theMesh=Mesh(theMeshFile)
+#theEdges=Edges(theMesh)
+#theEdges.printf()
+
+#U = np.ones([nElem,3])
+#V = np.zeros([nElem,3])
+#E = np.zeros([nElem,3])
+#E[5:50,:]=1
+
+#theResultFiles = "eta-%06d.txt"
+#print(compute(theMeshFile,theResultFiles,U,V,E,1,1,20))

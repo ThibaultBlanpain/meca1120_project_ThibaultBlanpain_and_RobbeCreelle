@@ -5,7 +5,7 @@ import tsunami as tsunami
 # -1- Lecture des données
 #
 
-theMeshFile = "PacificTriangleTiny.txt"
+theMeshFile = "PacificTriangleSmall.txt"
 [nNode,X,Y,H,nElem,elem] = tsunami.readMesh(theMeshFile)
 print(" == Number of elements : %d " % nElem)
 print(" == Number of nodes    : %d " % nNode)
@@ -37,7 +37,7 @@ tsunami.writeResult(theResultFiles,0,E)
 U = np.zeros([nElem,3])
 V = np.zeros([nElem,3])
 E = tsunami.readResult(theResultFiles,0,nElem)
-dt = 0.1; nIter = 100; nSave = 25
+dt = 10; nIter =500; nSave = 1
 [U,V,E] = tsunami.compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave)
 
 for iElem in [27,28] :
