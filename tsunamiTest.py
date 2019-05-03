@@ -5,7 +5,7 @@ import tsunami as tsunami
 # -1- Lecture des données
 #
 
-theMeshFile = "PacificTriangleSmall.txt"
+theMeshFile = "PacificTriangleTiny.txt"
 [nNode,X,Y,H,nElem,elem] = tsunami.readMesh(theMeshFile)
 print(" == Number of elements : %d " % nElem)
 print(" == Number of nodes    : %d " % nNode)
@@ -26,7 +26,7 @@ for iElem in range(nElem):
   y[iElem][:] = Y[nodes]
 E = tsunami.initialConditionOkada(x,y)
 
-theResultFiles = "eta-%06d.txt"
+theResultFiles = "etatest-%06d.txt"
 tsunami.writeResult(theResultFiles,0,E)
 
 #
@@ -37,7 +37,7 @@ tsunami.writeResult(theResultFiles,0,E)
 U = np.zeros([nElem,3])
 V = np.zeros([nElem,3])
 E = tsunami.readResult(theResultFiles,0,nElem)
-dt = 10; nIter =500; nSave = 1
+dt = 10; nIter =10; nSave = 20
 [U,V,E] = tsunami.compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave)
 
 for iElem in [27,28] :

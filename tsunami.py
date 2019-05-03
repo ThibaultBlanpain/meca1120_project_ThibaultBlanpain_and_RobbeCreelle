@@ -1,4 +1,5 @@
 import numpy as np
+from time import perf_counter as cl
 # -------------------------------------------------------------------------
 def readMesh(fileName) :
   with open(fileName,"r") as f :
@@ -70,8 +71,8 @@ def bathymetrie(theMesh,ielem,xsi,eta):# renvoie une interpollation de la bathym
     return interpollation2D(theMesh.H[Nodes],xsi,eta)
 
 def computeShapeTriangle(theMesh,Element,jaco) :#Element pas vectoriel malheureusement
-  dphidxsi = np.array([ 1.0, 0.0,-1.0])# attention a l'orientation
-  dphideta = np.array([ 0.0, 1.0,-1.0])#ttention a l'orientation
+  dphidxsi = np.array([ 1.0, 0.0,-1.0])
+  dphideta = np.array([ 0.0, 1.0,-1.0])
   nodes = theMesh.elem[Element]
   x = theMesh.X[nodes]
   y = theMesh.Y[nodes]
@@ -160,7 +161,6 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
   Ainverse = np.array([[18.0,-6.0,-6.0],[-6.0,18.0,-6.0],[-6.0,-6.0,18.0]])
   jaco=computeJacobian(theMesh)
   #interation rule 2D
-
   xsi=np.array([0.166666666666667,0.666666666666667,0.166666666666667])
   eta=np.array([0.166666666666667,0.166666666666667,0.666666666666667])
   weight=np.array([0.166666666666667,0.166666666666667,0.166666666666667])
@@ -176,6 +176,7 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
   B_E=np.zeros((len(E),3))
   while Counter!= nIter:
       #remise a zero des matrices B
+
       B_U[:,:]=0
       B_V[:,:]=0
       B_E[:,:]=0
@@ -183,6 +184,8 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
       for iElem in range(nElem):
           h=bathymetrie(theMesh,iElem,xsi,eta)
           u=interpollation2D(U[iElem],xsi,eta)
+          print(u)
+          print(U[iElem]@phi)
           v=interpollation2D(V[iElem],xsi,eta)
           x=interpollation2D(theMesh.X[elem[iElem]],xsi,eta)
           y=interpollation2D(theMesh.Y[elem[iElem]],xsi,eta)
@@ -192,7 +195,7 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
           B_E[iElem] += sum( (np.outer(u*h*bigR,dphidx) + np.outer(v*h*bigR,dphidy)) * weight *jaco[iElem]) #1
           B_E[iElem] += ((h*(x*u+y*v)/(R**2))*weight)@ phi*jaco[iElem] #2
 
-          f=2*omega*(4*R**2-x**2-y**2)/(4*R**2+x**2+y**2)
+          f=2*omega*np.sin(np.arcsin((4*R**2-x**2-y**2)/(4*R**2+x**2+y**2)))
 
           B_U[iElem] += ((f*v-gamma*u)*weight)@ phi *jaco[iElem]#3
           n_elev=interpollation2D(E[iElem],xsi,eta)# n_elev=H-h
@@ -256,7 +259,7 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
            v_l=np.array([V[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],V[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
            e_l=np.array([E[(mapLeft[0]/3).astype(int)][mapLeft[0]%3],E[(mapLeft[1]/3).astype(int)][mapLeft[1]%3]])
            uv_l=u_l@phi1D*nx+v_l@phi1D*ny
-           e_star= e_l@phi1D+np.sqrt(h/g)*1*uv_l
+           e_star= e_l@phi1D+np.sqrt(h/g)*uv_l
 
            #remplissage des matrice B #12=0 car u_star=0
            B_U[mapLeft] -= nx*g*(weight1D*e_star*bigR)@phi1D*0.5*jac#13
@@ -266,16 +269,19 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
       B_V=np.reshape(B_V,(nElem,3))
       B_E=np.reshape(B_E,(nElem,3))
       #inversion des matrices
-      for iElem in range(nElem):
-          B_U[iElem] =Ainverse@B_U[iElem]/jaco[iElem]# nx3= 3x3 @ nx1
-          B_V[iElem] =Ainverse@B_V[iElem]/jaco[iElem]
-          B_E[iElem] = Ainverse@B_E[iElem]/jaco[iElem]
+
+      #for iElem in range(nElem):
+          #B_U[iElem] =Ainverse@B_U[iElem]/jaco[iElem]# nx3= 3x3 @ nx1
+          #B_V[iElem] =Ainverse@B_V[iElem]/jaco[iElem]
+          #B_E[iElem] = Ainverse@B_E[iElem]/jaco[iElem]
 
       # euler explicite
-      U+= dt*B_U
-      V+= dt*B_V
-      E+= dt*B_E
+
+      U+= dt*np.dot(B_U,Ainverse)/jaco[:,None]
+      V+= dt*np.dot(B_V,Ainverse)/jaco[:,None]
+      E+= dt*np.dot(B_E,Ainverse)/jaco[:,None]
       Counter+=1
+
       #sauvegarde
       if (Counter % nSave == 0):
           writeResult(theResultFiles,Counter,E)
@@ -284,7 +290,7 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
   return [U,V,E]
 
 
-
+#
 #theMeshFile = "PacificTriangleTiny.txt"
 #[nNode,X,Y,H,nElem,elem] = readMesh(theMeshFile)
 #theMesh=Mesh(theMeshFile)
@@ -296,5 +302,4 @@ def compute(theMeshFile,theResultFiles,U,V,E,dt,nIter,nSave):
 #E = np.zeros([nElem,3])
 #E[5:50,:]=1
 
-#theResultFiles = "eta-%06d.txt"
 #print(compute(theMeshFile,theResultFiles,U,V,E,1,1,20))

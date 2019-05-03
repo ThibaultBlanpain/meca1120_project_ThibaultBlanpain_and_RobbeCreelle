@@ -123,10 +123,10 @@ def idle():
 
 # -------------------------------------------------------------------------
 
-iter = 0; delta = 1;
+iter = 0; delta = 10;
 R = 6371220;
 BathMax = 9368;
-theMeshFile = "PacificTriangleSmall.txt"
+theMeshFile = "PacificTriangleTiny.txt"
 theResultFiles = "eta-%06d.txt"
 theFlagBathymetry = False
 theMouse = 389
